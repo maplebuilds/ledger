@@ -1281,6 +1281,28 @@ function AddIncomeRow({ label, onAdd, showNote }) {
 }
 
 
+function VarMaxInput({ item, onUpdateVarItemMax }) {
+  const [val, setVal] = React.useState(String(item.max ?? 0));
+  const [saved, setSaved] = React.useState(true);
+  React.useEffect(() => { setVal(String(item.max ?? 0)); setSaved(true); }, [item.max]);
+  function doSave() { onUpdateVarItemMax(item.name, val); setSaved(true); }
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={e => e.stopPropagation()}>
+      <input type="number" value={val}
+        onChange={e => { setVal(e.target.value); setSaved(false); }}
+        onFocus={e => e.target.select()}
+        onKeyDown={e => { if(e.key === "Enter") { e.preventDefault(); e.stopPropagation(); doSave(); } }}
+        style={{ width: 60, fontSize: 12, padding: "2px 6px", background: "var(--bg-input)", border: `1px solid ${saved ? T.border2 : T.accent}`, borderRadius: 6, color: "var(--text-pri)", fontFamily: "inherit", textAlign: "right" }} />
+      {!saved && (
+        <button onClick={doSave}
+          style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, border: `1px solid ${T.accentBorder}`, background: T.accentDim, color: T.accent, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+          Save
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SettingsPanel({ allFixedCats, allVarCats, allFixedItems, allVarItems, onAddFixedCat, onAddVarCat, onDeleteFixedCat, onDeleteVarCat, onAddFixedItem, onAddVarItem, onDeleteFixedItem, onDeleteVarItem, deletedFixedCats, deletedVarCats, onRestoreFixedCat, onRestoreVarCat, onPermanentDeleteFixedCat, onPermanentDeleteVarCat, allFixedCatsMeta, allVarCatsMeta, theme, setTheme, fixedCatOrder, setFixedCatOrder, varCatOrder, setVarCatOrder, allFixedCatOrder, allVarCatOrder, onUpdateVarItemMax }) {
   const [newFixedCatLabel, setNewFixedCatLabel] = React.useState("");
   const [newFixedCatColor, setNewFixedCatColor] = React.useState("#3b82f6");
@@ -1460,25 +1482,22 @@ function SettingsPanel({ allFixedCats, allVarCats, allFixedItems, allVarItems, o
                       <span style={{ fontSize: 13, color: "var(--text-sec)" }}>{item.name}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 11, color: "var(--text-dim)" }}>max $</span>
-                        <input type="number" defaultValue={item.max || 0} key={`${item.name}_${item.max}`} onFocus={e => e.target.select()}
-                          onBlur={e => onUpdateVarItemMax(item.name, e.target.value)}
-                          onKeyDown={e => { if(e.key === "Enter") e.target.blur(); }}
-                          style={{ width: 60, fontSize: 12, padding: "2px 6px", background: "var(--bg-input)", border: `1px solid ${T.border2}`, borderRadius: 6, color: "var(--text-pri)", fontFamily: "inherit", textAlign: "right" }} />
+                        <VarMaxInput item={item} onUpdateVarItemMax={onUpdateVarItemMax} />
                         <span style={{ fontSize: 11, color: "var(--text-dim)" }}>/mo</span>
-                        <button onClick={() => onDeleteVarItem(item.name)} style={delBtn}>✕</button>
+                        <button onClick={e => { e.stopPropagation(); onDeleteVarItem(item.name); }} style={delBtn}>✕</button>
                       </div>
                     </div>
                   ))}
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 6, flexWrap: "wrap" }}>
                     <input type="text" placeholder="Item name" autoFocus={newVarItemCat === key} value={newVarItemCat === key ? newVarItemName : ""} onFocus={() => setNewVarItemCat(key)}
                       onChange={e => setNewVarItemName(e.target.value)}
                       onKeyDown={e => { if(e.key==="Enter" && newVarItemCat===key) { onAddVarItem(newVarItemName, key, newVarItemMax); setNewVarItemName(""); setNewVarItemMax(""); } }}
-                      style={Object.assign({}, inputStyle, { flex: 2 })} />
+                      style={Object.assign({}, inputStyle, { flex: 2, minWidth: 100 })} />
                     <input type="number" placeholder="Max $/mo" value={newVarItemCat === key ? newVarItemMax : ""} onFocus={e => { e.target.select(); setNewVarItemCat(key); }}
                       onChange={e => setNewVarItemMax(e.target.value)}
                       onKeyDown={e => { if(e.key==="Enter" && newVarItemCat===key) { onAddVarItem(newVarItemName, key, newVarItemMax); setNewVarItemName(""); setNewVarItemMax(""); } }}
                       style={Object.assign({}, inputStyle, { width: 90 })} />
-                    <button onClick={() => { onAddVarItem(newVarItemName, key, newVarItemMax); setNewVarItemName(""); setNewVarItemMax(""); }} style={btnStyle}>+ Add</button>
+                    <button onClick={() => { onAddVarItem(newVarItemName, key, newVarItemMax); setNewVarItemName(""); setNewVarItemMax(""); }} style={Object.assign({}, btnStyle, { flexShrink: 0 })}>+ Add</button>
                   </div>
                 </div>
               )}
@@ -1824,11 +1843,14 @@ export default function App() {
   const allVarCatOrder = varCatOrder.length > 0 ? [...varCatOrder.filter(k => baseVarOrder.includes(k)), ...baseVarOrder.filter(k => !varCatOrder.includes(k))] : baseVarOrder;
   // Transaction categories - derived from active var items so deletions in Settings reflect here
   const activeVarItemNames = new Set(allVarItems.map(i => i.name));
-  const activeTxnCategories = [
-    ...TXN_CATEGORIES.filter(c => c.varKey === null || activeVarItemNames.has(c.varKey)),
-    ...customVarItems.filter(i => i.name && i.name.trim() && !deletedVarCats.includes(i.cat)).map(i => ({ key: i.name.toLowerCase().replace(/ +/g, "_"), label: i.name, varKey: i.name, color: allVarCats[i.cat] ? allVarCats[i.cat].color : "#64748b" })),
-    ...Object.entries(customVarCats).filter(([k]) => !deletedVarCats.includes(k) && k && customVarCats[k]?.label).map(([k, v]) => ({ key: k, label: v.label, varKey: k, color: v.color })),
-  ];
+  const activeTxnCategories = (() => {
+    const seen = new Set();
+    return [
+      ...TXN_CATEGORIES.filter(c => c.varKey === null || activeVarItemNames.has(c.varKey)),
+      ...customVarItems.filter(i => i.name && i.name.trim() && !deletedVarCats.includes(i.cat)).map(i => ({ key: i.name.toLowerCase().replace(/ +/g, "_"), label: i.name, varKey: i.name, color: allVarCats[i.cat] ? allVarCats[i.cat].color : "#64748b" })),
+      ...Object.entries(customVarCats).filter(([k]) => !deletedVarCats.includes(k) && k && customVarCats[k]?.label).map(([k, v]) => ({ key: k, label: v.label, varKey: k, color: v.color })),
+    ].filter(c => { if (seen.has(c.key)) return false; seen.add(c.key); return true; });
+  })();
 
   useEffect(() => {
     try {
@@ -1972,6 +1994,8 @@ export default function App() {
     const vi = newVarItems !== undefined ? newVarItems : customVarItems;
     const df = newDelFixed !== undefined ? newDelFixed : deletedFixedItems;
     const dv = newDelVar !== undefined ? newDelVar : deletedVarItems;
+    const dfc = newDelFixedCats !== undefined ? newDelFixedCats : deletedFixedCats;
+    const dvc = newDelVarCats !== undefined ? newDelVarCats : deletedVarCats;
     const di = newDelIncome !== undefined ? newDelIncome : deletedIncomeSources;
     if (newFixedCats !== undefined) setCustomFixedCats(fc);
     if (newVarCats !== undefined) setCustomVarCats(vc);
@@ -1979,18 +2003,30 @@ export default function App() {
     if (newVarItems !== undefined) setCustomVarItems(vi);
     if (newDelFixed !== undefined) setDeletedFixedItems(df);
     if (newDelVar !== undefined) setDeletedVarItems(dv);
+    if (newDelFixedCats !== undefined) setDeletedFixedCats(dfc);
+    if (newDelVarCats !== undefined) setDeletedVarCats(dvc);
     if (newDelIncome !== undefined) setDeletedIncomeSources(di);
     const globalSubs = {
       removedSubs: removedSubs, customSubs: globalCustomSubs,
       subOverrides: globalSubOverrides, chargeMonths: globalChargeMonths,
       subNames: globalSubNames, permanentlyDeleted: permanentlyDeleted,
+      billingOverriddenSubs: billingOverriddenSubs,
       deletedPlanned: deletedPlanned,
       customFixedCats: fc, customVarCats: vc,
       customFixedItems: fi, customVarItems: vi,
       deletedFixedItems: df, deletedVarItems: dv,
-      deletedFixedCats: deletedFixedCats, deletedVarCats: deletedVarCats,
+      deletedFixedCats: dfc, deletedVarCats: dvc,
       deletedIncomeSources: di,
       globalIncomeSources: globalIncomeSources,
+      theme: theme,
+      fixedCatOrder: fixedCatOrder,
+      varCatOrder: varCatOrder,
+      learnedCats: learnedCats,
+      varItemMaxOverrides: varItemMaxOverrides,
+      savingsGoals: savingsGoals,
+      retroCharges: retroCharges,
+      startingBalance: startingBalance,
+      netWorthOverrides: netWorthOverrides,
     };
     setAllData(prev => {
       const updated = { ...prev, "budget_subs_global": globalSubs };
@@ -2001,21 +2037,22 @@ export default function App() {
 
   // --- Settings handlers ---
   function handleUpdateVarItemMax(name, newMax) {
-    const isDefault = VARIABLE_DEFAULTS.some(v => v.name === name);
-    if (isDefault) {
-      const newOverrides = Object.assign({}, varItemMaxOverrides, { [name]: Math.round(parseFloat(newMax) || 0) });
-      setVarItemMaxOverrides(newOverrides);
-      saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newVarMaxOverrides: newOverrides });
-    } else {
+    const isCustom = customVarItems.some(v => v.name === name);
+    if (isCustom) {
       const newCustom = customVarItems.map(v => v.name === name ? { ...v, max: Math.round(parseFloat(newMax) || 0) } : v);
       setCustomVarItems(newCustom);
       saveConfig(undefined, undefined, undefined, newCustom);
+    } else {
+      const newOverrides = Object.assign({}, varItemMaxOverrides, { [name]: Math.round(parseFloat(newMax) || 0) });
+      setVarItemMaxOverrides(newOverrides);
+      saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newVarMaxOverrides: newOverrides });
     }
   }
 
   function handleBatchUpdateVarItemMaxes(updates) {
-    const defaultUpdates = updates.filter(u => VARIABLE_DEFAULTS.some(v => v.name === u.name));
-    const customUpdates = updates.filter(u => !VARIABLE_DEFAULTS.some(v => v.name === u.name));
+    const customNames = new Set(customVarItems.map(v => v.name));
+    const customUpdates = updates.filter(u => customNames.has(u.name));
+    const defaultUpdates = updates.filter(u => !customNames.has(u.name));
     let newOverrides = { ...varItemMaxOverrides };
     defaultUpdates.forEach(u => { newOverrides[u.name] = Math.round(u.max); });
     let newCustom = customVarItems.map(v => {
@@ -2115,21 +2152,21 @@ export default function App() {
 
   function handleAddVarItem(name, cat, max) {
     if (!name.trim() || !cat) return;
-    const newItems = [...customVarItems, { name: name.trim(), cat: cat, max: parseFloat(max) || 500 }];
+    const newItems = [...customVarItems, { name: name.trim(), cat: cat, max: parseFloat(max) || 0 }];
     setCustomVarItems(newItems);
     saveConfig(undefined, undefined, undefined, newItems);
   }
 
   function handleDeleteFixedItem(name) {
-    const isDefault = FIXED_DEFAULTS.some(i => i.name === name);
-    if (isDefault) {
-      const newDel = [...deletedFixedItems, name];
-      setDeletedFixedItems(newDel);
-      saveConfig(undefined, undefined, undefined, undefined, newDel);
-    } else {
+    const isCustom = customFixedItems.some(i => i.name === name);
+    if (isCustom) {
       const newItems = customFixedItems.filter(i => i.name !== name);
       setCustomFixedItems(newItems);
       saveConfig(undefined, undefined, newItems);
+    } else {
+      const newDel = [...deletedFixedItems, name];
+      setDeletedFixedItems(newDel);
+      saveConfig(undefined, undefined, undefined, undefined, newDel);
     }
   }
 
@@ -2140,15 +2177,15 @@ export default function App() {
   }
 
   function handleDeleteVarItem(name) {
-    const isDefault = VARIABLE_DEFAULTS.some(i => i.name === name);
-    if (isDefault) {
-      const newDel = [...deletedVarItems, name];
-      setDeletedVarItems(newDel);
-      saveConfig(undefined, undefined, undefined, undefined, undefined, newDel);
-    } else {
+    const isCustom = customVarItems.some(i => i.name === name);
+    if (isCustom) {
       const newItems = customVarItems.filter(i => i.name !== name);
       setCustomVarItems(newItems);
       saveConfig(undefined, undefined, undefined, newItems);
+    } else {
+      const newDel = [...deletedVarItems, name];
+      setDeletedVarItems(newDel);
+      saveConfig(undefined, undefined, undefined, undefined, undefined, newDel);
     }
   }
 
@@ -4068,7 +4105,7 @@ export default function App() {
         })()}
 
         <div style={{ fontSize: 10, color: "var(--text-dim)", textAlign: "left", paddingTop: 20 }}>
-          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v2.8.5</span>
+          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v2.9.6</span>
         </div>
       </div>
 
