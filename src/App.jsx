@@ -1097,9 +1097,9 @@ function TransactionForm({ onAdd, categories, learnedCats }) {
       <div style={{ display: "flex", gap: 8 }}>
         <input type="text" placeholder="Add a note (optional)" value={note} onChange={e => setNote(e.target.value)}
           onKeyDown={e => { if(e.key === "Enter") handleAdd(); }}
-          style={{ flex: 1, fontSize: 12, padding: "6px 10px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 6, color: "var(--text-sec)", fontFamily: "inherit", boxSizing: "border-box" }} />
+          style={{ flex: 1, minWidth: 0, fontSize: 12, padding: "6px 10px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 6, color: "var(--text-sec)", fontFamily: "inherit", boxSizing: "border-box" }} />
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          style={{ fontSize: 12, padding: "6px 10px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 6, color: "var(--text-sec)", fontFamily: "inherit", boxSizing: "border-box" }} />
+          style={{ flexShrink: 0, width: 130, fontSize: 12, padding: "6px 8px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 6, color: "var(--text-sec)", fontFamily: "inherit", boxSizing: "border-box" }} />
       </div>
       <button onClick={handleAdd} style={{
         fontSize: 13, padding: "10px 20px", borderRadius: 8, width: "100%",
@@ -1654,7 +1654,7 @@ ${d.prevVarItems ? d.prevVarItems.filter(v => v.prev > 0).map(v => `- ${v.name}:
       {/* Floating button */}
       <button onClick={handleOpen}
         style={{
-          position: "fixed", bottom: 28, right: 48, zIndex: 200,
+          position: "fixed", bottom: 24, right: 20, zIndex: 200,
           width: 52, height: 52, borderRadius: "50%",
           background: T.accent, border: "none", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -1672,7 +1672,7 @@ ${d.prevVarItems ? d.prevVarItems.filter(v => v.prev > 0).map(v => `- ${v.name}:
       {/* Chat panel */}
       {open && (
         <div style={{
-          position: "fixed", bottom: 92, right: 48, zIndex: 200,
+          position: "fixed", bottom: 88, right: 20, zIndex: 200,
           width: 340, maxHeight: 500,
           background: "var(--bg-card)", borderRadius: 16,
           border: `1px solid ${T.accentBorder}`,
@@ -1941,7 +1941,7 @@ export default function App() {
     const {
       newAll, newPerm, newSubNames, newDelPlanned,
       newRetro, newLearned, newDeletedIncome, newVarMaxOverrides,
-      newCustomVarItems, newStartingBalance, newNetWorthOverrides
+      newCustomVarItems, newStartingBalance, newNetWorthOverrides, newSavingsGoals
     } = opts;
     const globalSubs = {
       removedSubs: removed,
@@ -1953,7 +1953,7 @@ export default function App() {
       billingOverriddenSubs: billingOverriddenSubs,
       deletedPlanned: newDelPlanned !== undefined ? newDelPlanned : deletedPlanned,
       customFixedCats: customFixedCats,
-      customVarCats: newCustomVarItems !== undefined ? newCustomVarItems : customVarItems,
+      customVarCats: customVarCats,
       customFixedItems: customFixedItems,
       customVarItems: newCustomVarItems !== undefined ? newCustomVarItems : customVarItems,
       deletedFixedItems: deletedFixedItems,
@@ -1967,7 +1967,7 @@ export default function App() {
       varCatOrder: varCatOrder,
       learnedCats: newLearned !== undefined ? newLearned : learnedCats,
       varItemMaxOverrides: newVarMaxOverrides !== undefined ? newVarMaxOverrides : varItemMaxOverrides,
-      savingsGoals: savingsGoals,
+      savingsGoals: newSavingsGoals !== undefined ? newSavingsGoals : savingsGoals,
       retroCharges: newRetro !== undefined ? newRetro : retroCharges,
       startingBalance: newStartingBalance !== undefined ? newStartingBalance : startingBalance,
       netWorthOverrides: newNetWorthOverrides !== undefined ? newNetWorthOverrides : netWorthOverrides,
@@ -2411,8 +2411,8 @@ export default function App() {
   const enrichedVar = allVarItemsWithMonthMaxes.map(v => (Object.assign({}, v, { value: variables[v.name] || 0 })));
 
   // Previous month data for % change
-  const prevMonthKey = `budget_${year}_${month - 1}`;
-  const prevData = month > 0 ? (allData[prevMonthKey] || null) : null;
+  const prevMonthKey = month === 0 ? `budget_${year - 1}_11` : `budget_${year}_${month - 1}`;
+  const prevData = allData[prevMonthKey] || null;
   const prevVariables = prevData ? (prevData.variables || {}) : null;
   const varGrouped = groupBy(enrichedVar, "cat");
 
@@ -2430,7 +2430,9 @@ export default function App() {
     if (d._chartNet !== remaining || d._chartVar !== totalVar || d._chartSubs !== subsTotal) {
       setAllData(prev => {
         const pd = prev[key] || {};
-        return { ...prev, [key]: { ...pd, _chartNet: remaining, _chartVar: totalVar, _chartSubs: subsTotal } };
+        const updated = { ...prev, [key]: { ...pd, _chartNet: remaining, _chartVar: totalVar, _chartSubs: subsTotal } };
+        save(updated);
+        return updated;
       });
     }
   }, [remaining, totalVar, month, year]);
@@ -2582,7 +2584,7 @@ export default function App() {
         });
         next[key] = { ...current, transactions: newTransactions, variables: newVars };
       });
-      // Supabase save handled by save() via setAllData trigger
+      save(next);
       return next;
     });
     setLearnedCats(newLearned);
@@ -3106,9 +3108,9 @@ export default function App() {
 
             {/* REPORT VIEW */}
             {expenseView === "report" && (() => {
-              const reportItems = allVarItemsWithMonthMaxes.filter(v => v.max > 0 || (variables && variables[v.name] > 0));
+              const reportItems = enrichedVar.filter(v => v.max > 0 || v.value > 0);
               const totalBudget = reportItems.reduce((s, v) => s + v.max, 0);
-              const totalSpent = reportItems.reduce((s, v) => s + (variables ? (variables[v.name] || 0) : 0), 0);
+              const totalSpent = reportItems.reduce((s, v) => s + v.value, 0);
               const totalDiff = totalBudget - totalSpent;
               return (
                 <div>
@@ -3120,7 +3122,7 @@ export default function App() {
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {reportItems.map(v => {
-                        const spent = variables ? (variables[v.name] || 0) : 0;
+                        const spent = v.value;
                         const max = v.max;
                         const diff = max - spent;
                         const pct = max > 0 ? Math.min((spent / max) * 100, 100) : 0;
@@ -3734,12 +3736,12 @@ export default function App() {
                         onBlur={e => {
                           const newGoals = savingsGoals.map((g, i) => i === idx ? { ...g, saved: Math.round(parseFloat(e.target.value) || 0) } : g);
                           setSavingsGoals(newGoals);
-                          saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths);
+                          saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newSavingsGoals: newGoals });
                         }}
                         onKeyDown={e => { if(e.key === "Enter") e.target.blur(); }}
                         style={{ width: 80, fontSize: 12, padding: "3px 8px", background: "var(--bg-input)", border: `1px solid ${T.border2}`, borderRadius: 6, color: "var(--text-pri)", fontFamily: "inherit" }} />
                       <div style={{ flex: 1 }} />
-                      <button onClick={() => { const newGoals = savingsGoals.filter((_, i) => i !== idx); setSavingsGoals(newGoals); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths); }}
+                      <button onClick={() => { const newGoals = savingsGoals.filter((_, i) => i !== idx); setSavingsGoals(newGoals); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newSavingsGoals: newGoals }); }}
                         style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, border: "1px solid #ef444433", background: "transparent", color: "#ef4444", cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
                     </div>
                   </div>
@@ -3751,7 +3753,7 @@ export default function App() {
             <div style={{ background: "var(--bg-card)", borderRadius: 12, padding: "18px 20px", border: `1px dashed ${T.border2}` }}>
               <div style={{ fontSize: 11, color: "var(--text-mute)", marginBottom: 14, letterSpacing: "0.1em", textTransform: "uppercase" }}>Add Savings Goal</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input type="text" placeholder="Goal name (e.g. Costa Rica Trip)" value={newGoalName} onChange={e => setNewGoalName(e.target.value)} onKeyDown={e => { if(e.key === "Enter") { if (!newGoalName.trim() || !newGoalTarget) return; const ng = [...savingsGoals, { id: Date.now() + Math.random(), name: newGoalName.trim(), target: Math.round(parseFloat(newGoalTarget) || 0), deadline: newGoalDeadline || null, saved: 0 }]; setSavingsGoals(ng); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths); setNewGoalName(""); setNewGoalTarget(""); setNewGoalDeadline(""); } }}
+                <input type="text" placeholder="Goal name (e.g. Costa Rica Trip)" value={newGoalName} onChange={e => setNewGoalName(e.target.value)} onKeyDown={e => { if(e.key === "Enter") { if (!newGoalName.trim() || !newGoalTarget) return; const ng = [...savingsGoals, { id: Date.now() + Math.random(), name: newGoalName.trim(), target: Math.round(parseFloat(newGoalTarget) || 0), deadline: newGoalDeadline || null, saved: 0 }]; setSavingsGoals(ng); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newSavingsGoals: ng }); setNewGoalName(""); setNewGoalTarget(""); setNewGoalDeadline(""); } }}
                   style={{ flex: 2, minWidth: 160, fontSize: 13, padding: "8px 12px", background: "var(--bg-input)", border: `1px solid ${T.border2}`, borderRadius: 8, color: "var(--text-pri)", fontFamily: "inherit" }} />
                 <input type="number" placeholder="Target $" value={newGoalTarget} onFocus={e => e.target.select()} onChange={e => setNewGoalTarget(e.target.value)}
                   style={{ flex: 1, minWidth: 100, fontSize: 13, padding: "8px 12px", background: "var(--bg-input)", border: `1px solid ${T.border2}`, borderRadius: 8, color: "var(--text-pri)", fontFamily: "inherit" }} />
@@ -3765,7 +3767,7 @@ export default function App() {
                   <option value="">Year</option>
                   {[CUR_YEAR, CUR_YEAR + 1, CUR_YEAR + 2, CUR_YEAR + 3].map(y => <option key={y} value={String(y)}>{y}</option>)}
                 </select>
-                <button onClick={() => { if (!newGoalName.trim() || !newGoalTarget) return; const ng = [...savingsGoals, { id: Date.now() + Math.random(), name: newGoalName.trim(), target: Math.round(parseFloat(newGoalTarget) || 0), deadline: newGoalDeadline || null, saved: 0 }]; setSavingsGoals(ng); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths); setNewGoalName(""); setNewGoalTarget(""); setNewGoalDeadline(""); }}
+                <button onClick={() => { if (!newGoalName.trim() || !newGoalTarget) return; const ng = [...savingsGoals, { id: Date.now() + Math.random(), name: newGoalName.trim(), target: Math.round(parseFloat(newGoalTarget) || 0), deadline: newGoalDeadline || null, saved: 0 }]; setSavingsGoals(ng); saveGlobalSubs(removedSubs, globalCustomSubs, globalSubOverrides, globalChargeMonths, { newSavingsGoals: ng }); setNewGoalName(""); setNewGoalTarget(""); setNewGoalDeadline(""); }}
                   style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.accentBorder}`, background: T.accentDim, color: T.accent, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>+ Add Goal</button>
               </div>
             </div>
@@ -3847,7 +3849,7 @@ export default function App() {
                             <input type="text" defaultValue={txn.note || ""} placeholder="add note..."
                               onBlur={e => handleUpdateTransactionNote(txn.id, e.target.value)}
                               onKeyDown={e => { if(e.key === "Enter") e.target.blur(); }}
-                              style={{ fontSize: 10, color: "var(--text-dim)", fontStyle: "italic", background: "transparent", border: "none", outline: "none", padding: 0, fontFamily: "inherit", width: "100%", cursor: "text" }} />
+                              style={{ fontSize: 10, color: "var(--text-dim)", fontStyle: "italic", background: "transparent", border: "none", outline: "none", padding: 0, fontFamily: "inherit", width: "100%", minWidth: 0, cursor: "text" }} />
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
                               <select value={txn.catKey} onChange={e => handleUpdateTransactionCat(txn.id, e.target.value)}
                                 style={{ fontSize: 10, padding: "1px 4px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 4, color: "var(--text-dim)", fontFamily: "inherit", maxWidth: 140 }}>
@@ -3856,7 +3858,7 @@ export default function App() {
                               <input type="date" defaultValue={txn.date || ""}
                                 onBlur={e => handleUpdateTransactionDate(txn.id, e.target.value)}
                                 onKeyDown={e => { if(e.key === "Enter") e.target.blur(); }}
-                                style={{ fontSize: 10, padding: "1px 4px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 4, color: "var(--text-dim)", fontFamily: "inherit" }} />
+                                style={{ fontSize: 10, padding: "1px 4px", background: "var(--bg-input)", border: `1px solid ${T.border}`, borderRadius: 4, color: "var(--text-dim)", fontFamily: "inherit", width: 130, flexShrink: 0 }} />
                             </div>
                           </div>
                         </div>
@@ -3929,7 +3931,7 @@ export default function App() {
         )}
 
         {tab === 5 && (() => {
-          const NW_YEAR = CUR_YEAR;
+          const NW_YEAR = year;
           const MLABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
           const balanceRows = [];
           let runningBalance = startingBalance !== null ? startingBalance : null;
@@ -4058,15 +4060,15 @@ export default function App() {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {balanceRows.map(row => (
-                      <div key={row.month} style={{ background: "var(--bg-card)", borderRadius: 10, padding: "12px 16px", border: `1px solid ${row.hasOverride ? T.accentBorder : T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        <div style={{ minWidth: 60 }}>
+                      <div key={row.month} style={{ background: "var(--bg-card)", borderRadius: 10, padding: "12px 16px", border: `1px solid ${row.hasOverride ? T.accentBorder : T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ minWidth: 40 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: row.hasOverride ? T.accent : "var(--text-pri)" }}>{row.label}</div>
                           {row.hasOverride && <div style={{ fontSize: 9, color: T.accent, letterSpacing: "0.08em" }}>overridden</div>}
                         </div>
-                        <div style={{ fontSize: 11, color: row.net !== null ? (row.net >= 0 ? "#4ade80" : "#ef4444") : "var(--text-dim)", minWidth: 70, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: row.net !== null ? (row.net >= 0 ? "#4ade80" : "#ef4444") : "var(--text-dim)", flex: 1, textAlign: "center", minWidth: 80 }}>
                           {row.net !== null ? `${row.net >= 0 ? "+" : ""}${fmt(row.net)} net` : "no data"}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: row.balance !== null ? (row.balance >= 0 ? "#4ade80" : "#ef4444") : "var(--text-dim)" }}>
                             {row.balance !== null ? fmt(row.balance) : "—"}
                           </span>
@@ -4078,7 +4080,7 @@ export default function App() {
                               onFocus={e => e.target.select()}
                               onBlur={e => { if (e.target.value.trim()) { saveOverride(row.overrideKey, e.target.value); } }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
-                              style={{ width: 80, fontSize: 12, padding: "3px 6px", background: "var(--bg-input)", border: `1px solid ${row.hasOverride ? T.accentBorder : T.border2}`, borderRadius: 6, color: "var(--text-pri)", fontFamily: "inherit", boxSizing: "border-box" }}
+                              style={{ width: 72, fontSize: 12, padding: "3px 6px", background: "var(--bg-input)", border: `1px solid ${row.hasOverride ? T.accentBorder : T.border2}`, borderRadius: 6, color: "var(--text-pri)", fontFamily: "inherit", boxSizing: "border-box" }}
                             />
                             {row.hasOverride && (
                               <button onClick={() => clearOverride(row.overrideKey)}
@@ -4105,7 +4107,7 @@ export default function App() {
         })()}
 
         <div style={{ fontSize: 10, color: "var(--text-dim)", textAlign: "left", paddingTop: 20 }}>
-          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v2.9.6</span>
+          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v3.0.2</span>
         </div>
       </div>
 
