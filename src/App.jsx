@@ -639,7 +639,7 @@ Rules:
           const cat = activeTxnCategories.find(c => c.key === finalCatKey);
           const varKey = cat ? cat.varKey : finalCatKey;
           if (finalCatKey !== "other") newLearned[finalName.toLowerCase()] = finalCatKey;
-          newTransactions.push({ id: Date.now() + Math.random(), name: finalName, amount: finalAmt, catKey: finalCatKey, varKey, label: cat ? cat.label : finalCatKey, note: "" });
+          newTransactions.push({ id: Date.now() + Math.random(), name: finalName, amount: finalAmt, catKey: finalCatKey, varKey, label: cat ? cat.label : finalCatKey, note: "", date: txn.date });
           if (varKey) newVars[varKey] = (newVars[varKey] || 0) + finalAmt;
         });
         next[key] = { ...current, transactions: newTransactions, variables: newVars };
@@ -2579,6 +2579,7 @@ export default function App() {
             varKey,
             label: cat ? cat.label : finalCatKey,
             note: "",
+            date: txn.date,
           });
           if (varKey) newVars[varKey] = (newVars[varKey] || 0) + finalAmt;
         });
@@ -4107,7 +4108,7 @@ export default function App() {
         })()}
 
         <div style={{ fontSize: 10, color: "var(--text-dim)", textAlign: "left", paddingTop: 20 }}>
-          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v3.0.2</span>
+          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v3.0.3</span>
         </div>
       </div>
 
