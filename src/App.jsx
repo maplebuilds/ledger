@@ -1844,12 +1844,18 @@ export default function App() {
   // Transaction categories - derived from active var items so deletions in Settings reflect here
   const activeVarItemNames = new Set(allVarItems.map(i => i.name));
   const activeTxnCategories = (() => {
-    const seen = new Set();
+    const seenKeys = new Set();
+    const seenLabels = new Set();
     return [
       ...TXN_CATEGORIES.filter(c => c.varKey === null || activeVarItemNames.has(c.varKey)),
       ...customVarItems.filter(i => i.name && i.name.trim() && !deletedVarCats.includes(i.cat)).map(i => ({ key: i.name.toLowerCase().replace(/ +/g, "_"), label: i.name, varKey: i.name, color: allVarCats[i.cat] ? allVarCats[i.cat].color : "#64748b" })),
       ...Object.entries(customVarCats).filter(([k]) => !deletedVarCats.includes(k) && k && customVarCats[k]?.label).map(([k, v]) => ({ key: k, label: v.label, varKey: k, color: v.color })),
-    ].filter(c => { if (seen.has(c.key)) return false; seen.add(c.key); return true; });
+    ].filter(c => {
+      if (seenKeys.has(c.key) || seenLabels.has(c.label.toLowerCase())) return false;
+      seenKeys.add(c.key);
+      seenLabels.add(c.label.toLowerCase());
+      return true;
+    });
   })();
 
   useEffect(() => {
@@ -4108,7 +4114,7 @@ export default function App() {
         })()}
 
         <div style={{ fontSize: 10, color: "var(--text-dim)", textAlign: "left", paddingTop: 20 }}>
-          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v3.0.3</span>
+          * overridden · ✦ planned · data saves automatically · <span style={{ color: T.accentText, opacity: 0.5 }}>v3.0.4</span>
         </div>
       </div>
 
